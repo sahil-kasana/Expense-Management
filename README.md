@@ -42,4 +42,5 @@ A full-stack financial companion with a premium, mobile-first design, secure app
 4. Run `npm start` or `npm run dev`.
 5. Open `frontend/index.html` in your browser.
 
-Developed with ❤️ by Antigravity.
+Developed with ❤️ by Sahil Kasana.
+

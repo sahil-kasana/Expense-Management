@@ -3,6 +3,11 @@ const BASE_URL = window.location.hostname === 'localhost' || window.location.hos
     : 'https://expense-management-560d.onrender.com';
 
 const API_URL = `${BASE_URL}/api/expenses`;
+const USER_URL = `${BASE_URL}/api/users`;
+
+// Auth State
+let currentUser = JSON.parse(localStorage.getItem('myBuddyUser')) || null;
+let authToken = localStorage.getItem('myBuddyToken') || null;
 
 // DOM Elements
 const views = document.querySelectorAll('.app-view');
@@ -52,11 +57,160 @@ const categories = {
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
     console.log('%c My Buddy Initializing... ', 'background: #4f46e5; color: #fff; font-weight: bold;');
-    checkAppLock();
-    fetchCategories();
-    fetchExpenses();
+    
+    checkAuthentication();
+    setupAuthListeners();
     setupEventListeners();
+    
+    if (currentUser) {
+        checkAppLock();
+        fetchCategories();
+        fetchExpenses();
+        fetchBudget(); // Add this
+        updateUserProfileUI();
+    }
 });
+
+function checkAuthentication() {
+    const authScreen = document.getElementById('authScreen');
+    if (!authToken || !currentUser) {
+        authScreen.classList.remove('hidden');
+    } else {
+        authScreen.classList.add('hidden');
+    }
+}
+
+// Authenticated Fetch Helper
+async function authFetch(url, options = {}) {
+    if (!authToken) {
+        logout();
+        throw new Error('No auth token');
+    }
+
+    const headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+    };
+
+    const response = await fetch(url, { ...options, headers });
+    
+    if (response.status === 401) {
+        logout();
+        throw new Error('Unauthorized');
+    }
+    
+    return response;
+}
+
+function setupAuthListeners() {
+    const toggleBtn = document.getElementById('toggleAuth');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const authTitle = document.getElementById('authTitle');
+    const authSubTitle = document.getElementById('authSubTitle');
+    const authToggleText = document.getElementById('authToggleText');
+
+    toggleBtn.addEventListener('click', () => {
+        const isLogin = !loginForm.classList.contains('hidden');
+        if (isLogin) {
+            loginForm.classList.add('hidden');
+            registerForm.classList.remove('hidden');
+            authTitle.textContent = 'Create Account';
+            authSubTitle.textContent = 'Start your savings journey today';
+            authToggleText.textContent = 'Already have an account?';
+            toggleBtn.textContent = 'Login Now';
+        } else {
+            loginForm.classList.remove('hidden');
+            registerForm.classList.add('hidden');
+            authTitle.textContent = 'Welcome Back';
+            authSubTitle.textContent = 'Sign in to manage your savings';
+            authToggleText.textContent = "Don't have an account?";
+            toggleBtn.textContent = 'Register Now';
+        }
+    });
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+
+        try {
+            const res = await fetch(`${USER_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const result = await res.json();
+            if (result.success) {
+                authToken = result.data.token;
+                currentUser = { name: result.data.name, email: result.data.email };
+                localStorage.setItem('myBuddyToken', authToken);
+                localStorage.setItem('myBuddyUser', JSON.stringify(currentUser));
+                
+                showToast('Login Successful');
+                checkAuthentication();
+                location.reload(); // Refresh to boot app with user data
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (err) {
+            showToast('Login Failed', 'error');
+        }
+    });
+
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('regName').value;
+        const email = document.getElementById('regEmail').value;
+        const password = document.getElementById('regPassword').value;
+
+        try {
+            const res = await fetch(`${USER_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, password })
+            });
+            const result = await res.json();
+            if (result.success) {
+                showToast('Account Created! Please Login.');
+                toggleBtn.click();
+            } else {
+                showToast(result.message, 'error');
+            }
+        } catch (err) {
+            showToast('Registration Failed', 'error');
+        }
+    });
+
+    // Logout Buttons
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('desktopLogoutBtn').addEventListener('click', logout);
+}
+
+function logout() {
+    localStorage.removeItem('myBuddyToken');
+    localStorage.removeItem('myBuddyUser');
+    localStorage.setItem('expenseProLock', 'false'); // Reset lock on logout
+    location.reload();
+}
+
+function updateUserProfileUI() {
+    if (!currentUser) return;
+    
+    // Desktop Labels
+    const nameDesktop = document.getElementById('userNameDesktop');
+    const emailDesktop = document.getElementById('userEmailDesktop');
+    const initialDesktop = document.getElementById('userInitialDesktop');
+    
+    if (nameDesktop) nameDesktop.textContent = currentUser.name;
+    if (emailDesktop) emailDesktop.textContent = currentUser.email;
+    if (initialDesktop) initialDesktop.textContent = currentUser.name.charAt(0).toUpperCase();
+
+    // Mobile Labels
+    const nameMobile = document.getElementById('userNameMobile');
+    if (nameMobile) nameMobile.textContent = currentUser.name.split(' ')[0];
+}
 
 function setupEventListeners() {
     // Navigation
@@ -108,6 +262,9 @@ function setupEventListeners() {
         budgetIndicator.textContent = rupeeFormatter.format(monthlyBudget);
         updateDashboard(); // Refresh progress bar
     });
+    budgetRange.addEventListener('change', (e) => {
+        saveBudget(parseInt(e.target.value));
+    });
 
     // Custom Category Toggle
     const categorySelect = document.getElementById('category');
@@ -122,18 +279,30 @@ function setupEventListeners() {
 
     // App Lock Toggle
     const lockToggle = document.getElementById('appLockToggle');
-    lockToggle.addEventListener('change', (e) => {
+    lockToggle.addEventListener('change', async (e) => {
         const enabled = e.target.checked;
         if (enabled) {
-            if (confirm('Enable biometric/device lock for extra security?')) {
-                localStorage.setItem('expenseProLock', 'true');
-                showToast('Device lock enabled');
+            // Verify biometric before enabling
+            if (window.PublicKeyCredential) {
+                try {
+                    const challenge = new Uint8Array(32);
+                    window.crypto.getRandomValues(challenge);
+                    await navigator.credentials.get({
+                        publicKey: { challenge, rpId: window.location.hostname, userVerification: 'required', allowCredentials: [] }
+                    });
+                    localStorage.setItem('expenseProLock', 'true');
+                    showToast('Biometric lock enabled');
+                } catch (err) {
+                    e.target.checked = false;
+                    showToast('Authentication failed or cancelled', 'error');
+                }
             } else {
-                e.target.checked = false;
+                localStorage.setItem('expenseProLock', 'true');
+                showToast('App lock enabled');
             }
         } else {
             localStorage.removeItem('expenseProLock');
-            showToast('Device lock disabled');
+            showToast('App lock disabled');
         }
     });
 
@@ -168,54 +337,42 @@ function setupEventListeners() {
 function checkAppLock() {
     const lockEnabled = localStorage.getItem('expenseProLock') === 'true';
     const lockScreen = document.getElementById('lockScreen');
-    const lockToggle = document.getElementById('appLockToggle');
-
     if (lockEnabled) {
         lockScreen.classList.remove('hidden');
-        lockToggle.checked = true;
         isLocked = true;
+        // Auto-unlock prompt
+        setTimeout(unlockApp, 500);
     }
 }
 
 async function unlockApp() {
-    // In a real mobile environment, we'd use WebAuthn or a Capacitor/Cordova plugin
-    // Here we simulate the device biometric check with a simple confirmation 
-    // to mimic the "confirmation required" part of the user request.
-    try {
-        // Simple mock of Biometric Prompt
-        const success = confirm('Confirm identity with device lock?');
-        if (success) {
+    if (window.PublicKeyCredential) {
+        try {
+            // Trigger native biometric/PIN prompt
+            const challenge = new Uint8Array(32);
+            window.crypto.getRandomValues(challenge);
+            await navigator.credentials.get({
+                publicKey: {
+                    challenge,
+                    rpId: window.location.hostname,
+                    userVerification: 'required',
+                    allowCredentials: []
+                }
+            });
+            
             document.getElementById('lockScreen').classList.add('hidden');
             isLocked = false;
             showToast('Welcome back!', 'success');
+        } catch (err) {
+            console.warn('Biometric cancelled or failed');
+            showToast('Authentication failed', 'error');
         }
-    } catch (err) {
-        showToast('Authentication failed', 'error');
-    }
-}
-
-// Categories Logic
-async function fetchCategories() {
-    try {
-        const res = await fetch(`${API_URL}/categories`);
-        const result = await res.json();
-        if (result.success) {
-            dbCategories = result.data;
-            populateCategoryDropdown();
+    } else {
+        if (confirm('Unlock My Buddy?')) {
+            document.getElementById('lockScreen').classList.add('hidden');
+            isLocked = false;
         }
-    } catch (err) {
-        console.error('Failed to fetch categories');
     }
-}
-
-function populateCategoryDropdown() {
-    const select = document.getElementById('category');
-    const currentVal = select.value;
-    
-    let html = dbCategories.map(cat => `<option value="${cat.name}">${cat.name}</option>`).join('');
-    html += '<option value="Other">Other (Add New)</option>';
-    select.innerHTML = html;
-    if (currentVal) select.value = currentVal;
 }
 
 // View Controller
@@ -248,7 +405,7 @@ function switchView(viewId) {
 // Fetch Data
 async function fetchExpenses() {
     try {
-        const response = await fetch(API_URL);
+        const response = await authFetch(API_URL);
         const result = await response.json();
         if (result.success) {
             expenses = result.data;
@@ -258,7 +415,36 @@ async function fetchExpenses() {
             if (currentView === 'transactions') renderTransactionsTable();
         }
     } catch (error) {
-        showToast('Error connecting to server', 'error');
+        console.error('Fetch error:', error);
+    }
+}
+
+// Budget Logic
+async function fetchBudget() {
+    try {
+        const res = await authFetch(`${API_URL}/budgets`);
+        const result = await res.json();
+        if (result.success && result.data.length > 0) {
+            // For now we assume one global monthly budget for "All" or first category
+            monthlyBudget = parseFloat(result.data[0].limit_amount);
+            document.getElementById('budgetRange').value = monthlyBudget;
+            document.getElementById('budgetValueIndicator').textContent = rupeeFormatter.format(monthlyBudget);
+            updateDashboard();
+        }
+    } catch (err) {
+        console.error('Failed to fetch budget');
+    }
+}
+
+async function saveBudget(amount) {
+    try {
+        await authFetch(`${API_URL}/budgets`, {
+            method: 'POST',
+            body: JSON.stringify({ category: 'Total', limit_amount: amount })
+        });
+        showToast('Budget saved');
+    } catch (err) {
+        console.error('Failed to save budget');
     }
 }
 
@@ -491,9 +677,8 @@ async function handleFormSubmit(e) {
         }
         
         try {
-            const catRes = await fetch(`${BASE_URL}/api/expenses/categories`, {
+            const catRes = await authFetch(`${API_URL}/categories`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: customCatName, type: type })
             });
             const catResult = await catRes.json();
@@ -508,7 +693,7 @@ async function handleFormSubmit(e) {
 
     const data = {
         title: document.getElementById('title').value,
-        amount: document.getElementById('amount').value,
+        amount: parseFloat(document.getElementById('amount').value),
         category: category,
         date: document.getElementById('date').value,
         description: document.getElementById('description').value,
@@ -518,9 +703,8 @@ async function handleFormSubmit(e) {
     try {
         const method = id ? 'PUT' : 'POST';
         const url = id ? `${API_URL}/${id}` : API_URL;
-        const res = await fetch(url, {
+        const res = await authFetch(url, {
             method,
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
         const result = await res.json();
@@ -535,19 +719,37 @@ async function handleFormSubmit(e) {
 }
 
 async function deleteExpense(id) {
-    if (!confirm('Are you sure?')) return;
+    if (!confirm('Are you sure you want to delete this transaction?')) return;
     try {
-        const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        const res = await authFetch(`${API_URL}/${id}`, { method: 'DELETE' });
         const result = await res.json();
         if (result.success) {
-            showToast(result.message);
+            showToast('Deleted successfully');
             fetchExpenses();
         }
     } catch (err) {
-        showToast('Error deleting', 'error');
+        showToast('Delete failed', 'error');
     }
 }
 
+async function fetchCategories() {
+    try {
+        const res = await authFetch(`${API_URL}/categories`);
+        const result = await res.json();
+        if (result.success) {
+            dbCategories = result.data;
+            const select = document.getElementById('category');
+            const currentValue = select.value;
+            
+            // Keep "Other" at the end
+            select.innerHTML = dbCategories.map(cat => `<option value="${cat.name}">${cat.name}</option>`).join('') + '<option value="Other">Other (Add New)</option>';
+            
+            if (currentValue) select.value = currentValue;
+        }
+    } catch (err) {
+        console.error('Failed to fetch categories');
+    }
+}
 function editExpense(id) {
     const exp = expenses.find(e => e.id === id);
     if (!exp) return;
@@ -558,7 +760,9 @@ function editExpense(id) {
     
     // Set category (ensure it exists in list first)
     const select = document.getElementById('category');
-    if (![...select.options].some(opt => opt.value === exp.category)) {
+    // Check if the expense's category is already in the select options (from dbCategories)
+    if (!dbCategories.some(cat => cat.name === exp.category)) {
+        // If not, add it temporarily to the select list
         const opt = document.createElement('option');
         opt.value = exp.category;
         opt.textContent = exp.category;

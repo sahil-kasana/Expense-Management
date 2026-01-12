@@ -122,19 +122,94 @@
 
 <body class="bg-gray-50 min-h-screen pb-20 md:pb-0">
 
-    <!-- App Lock Screen Overlay -->
-    <div id="lockScreen"
-        class="fixed inset-0 bg-indigo-600 z-[100] flex flex-col items-center justify-center text-white hidden">
-        <div class="bg-white p-4 rounded-full text-indigo-600 mb-6 animate-pulse">
-            <i class="fas fa-lock fa-3x"></i>
+    <!-- Auth Screen (Login/Register) -->
+    <div id="authScreen"
+        class="fixed inset-0 z-[100] bg-indigo-600 flex items-center justify-center p-6 overflow-hidden">
+        <!-- Floating bubbles for aesthetic -->
+        <div class="absolute w-96 h-96 bg-indigo-500 rounded-full blur-3xl opacity-20 -top-20 -left-20"></div>
+        <div class="absolute w-64 h-64 bg-indigo-400 rounded-full blur-3xl opacity-20 -bottom-20 -right-20"></div>
+
+        <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-10 relative z-10 transition-all duration-500"
+            id="authCard">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <img src="img/logo.png" alt="Logo" class="w-10 h-10 object-cover rounded-lg">
+                </div>
+                <h2 class="text-2xl font-black text-gray-800 tracking-tight" id="authTitle">Welcome Back</h2>
+                <p class="text-gray-500 text-sm mt-1" id="authSubTitle">Sign in to manage your savings</p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="space-y-4">
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Email</label>
+                    <input type="email" id="loginEmail" required placeholder="name@domain.com"
+                        class="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm">
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••"
+                        class="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm">
+                </div>
+                <button type="submit"
+                    class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+                    Login <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <!-- Register Form (Hidden by default) -->
+            <form id="registerForm" class="space-y-4 hidden">
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Full
+                        Name</label>
+                    <input type="text" id="regName" required placeholder="John Doe"
+                        class="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm">
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Email</label>
+                    <input type="email" id="regEmail" required placeholder="name@domain.com"
+                        class="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm">
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                    <input type="password" id="regPassword" required placeholder="••••••••"
+                        class="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm">
+                </div>
+                <button type="submit"
+                    class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+                    Create Account <i class="fas fa-user-plus"></i>
+                </button>
+            </form>
+
+            <div class="mt-8 text-center text-sm text-gray-500">
+                <span id="authToggleText">Don't have an account?</span>
+                <button id="toggleAuth" class="text-indigo-600 font-bold ml-1 hover:underline">Register Now</button>
+            </div>
         </div>
-        <h2 class="text-3xl font-bold mb-2">My Buddy Locked</h2>
-        <p class="text-indigo-100 mb-8">Access your financial dashboard</p>
-        <button id="unlockBtn"
-            class="bg-white text-indigo-600 px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-indigo-50 transition-all flex items-center gap-2">
-            <i class="fas fa-fingerprint"></i> Unlock with Device
-        </button>
-        <p class="mt-10 text-[10px] opacity-50 uppercase tracking-widest">Secure Financial Access</p>
+    </div>
+
+    <!-- App Lock Screen (Biometric Style) -->
+    <div id="lockScreen"
+        class="fixed inset-0 z-[110] backdrop-blur-3xl bg-white/80 dark:bg-slate-950/80 flex flex-col items-center justify-center p-6 hidden">
+        <div class="text-center">
+            <div
+                class="w-24 h-24 rounded-3xl bg-indigo-600 text-white flex items-center justify-center mx-auto mb-8 shadow-2xl animate-pulse">
+                <i class="fas fa-fingerprint text-4xl"></i>
+            </div>
+            <h2 class="text-3xl font-black text-gray-800 mb-2">My Buddy is Locked</h2>
+            <p class="text-gray-500 mb-12">Authenticate to access your dashboard</p>
+
+            <button id="unlockBtn"
+                class="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-4">
+                <i class="fas fa-shield-halved text-xl"></i>
+                UNLOCK WITH BIOMETRIC
+            </button>
+
+            <button id="logoutBtn"
+                class="mt-8 text-red-500 font-bold hover:underline opacity-50 hover:opacity-100 transition-opacity">
+                Switch Account / Logout
+            </button>
+        </div>
     </div>
 
     <!-- Desktop Sidebar (Hidden on Mobile) -->
@@ -163,8 +238,24 @@
                 class="nav-link flex items-center gap-3 p-3 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
                 <i class="fas fa-cog"></i> Settings
             </a>
-        </nav>
+            <div class="pt-6 mt-6 border-t border-gray-100">
+                <div class="flex items-center gap-3 p-2 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                        <span id="userInitialDesktop">U</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-black text-gray-800 truncate" id="userNameDesktop">User Name</p>
+                        <p class="text-[10px] text-gray-400 truncate" id="userEmailDesktop">user@example.com</p>
+                    </div>
+                </div>
+            </div>
 
+            <a href="#" id="desktopLogoutBtn"
+                class="nav-link flex items-center gap-3 p-3 rounded-lg text-red-500 hover:bg-red-50 transition-colors mt-4">
+                <i class="fas fa-right-from-bracket"></i> Logout
+            </a>
+        </nav>
 
     </aside>
 
@@ -174,7 +265,10 @@
             <div class="w-8 h-8 rounded-lg overflow-hidden shadow-sm">
                 <img src="img/logo.png" alt="My Buddy Logo" class="w-full h-full object-cover">
             </div>
-            <h1 class="text-lg font-bold text-gray-800">My Buddy</h1>
+            <div>
+                <h1 class="text-sm font-black text-gray-800 leading-none">My Buddy</h1>
+                <p class="text-[10px] text-indigo-600 font-bold" id="userNameMobile">User</p>
+            </div>
         </div>
         <button id="addExpenseBtnMobile"
             class="bg-indigo-600 text-white h-10 w-10 rounded-full flex items-center justify-center shadow-lg shadow-indigo-200">

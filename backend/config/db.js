@@ -46,9 +46,20 @@ async function initializeDatabase() {
             throw connErr;
         }
 
+        const createUsersTable = `
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
         const createExpensesTable = `
             CREATE TABLE IF NOT EXISTS expenses (
                 id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 amount DECIMAL(10, 2) NOT NULL,
                 category VARCHAR(100) NOT NULL,
@@ -56,58 +67,76 @@ async function initializeDatabase() {
                 date DATETIME NOT NULL,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX (user_id)
             )
         `;
-        const createBudgetsTable = `
-            CREATE TABLE IF NOT EXISTS budgets (
-                category VARCHAR(100) PRIMARY KEY,
-                limit_amount DECIMAL(10, 2) NOT NULL,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
-        `;
+
         const createCategoriesTable = `
             CREATE TABLE IF NOT EXISTS categories (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) UNIQUE NOT NULL,
+                user_id INT NULL,
+                name VARCHAR(100) NOT NULL,
                 icon VARCHAR(50) DEFAULT 'fa-tag',
                 color VARCHAR(100) DEFAULT 'bg-gray-100 text-gray-600',
-                type ENUM('expense', 'income') DEFAULT 'expense'
+                type ENUM('expense', 'income') DEFAULT 'expense',
+                INDEX (user_id)
+            )
+        `;
+
+        const createBudgetsTable = `
+            CREATE TABLE IF NOT EXISTS budgets (
+                user_id INT NOT NULL,
+                category VARCHAR(100) NOT NULL,
+                limit_amount DECIMAL(10, 2) NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, category)
             )
         `;
         
+        await pool.query(createUsersTable);
         await pool.query(createExpensesTable);
-        await pool.query(createBudgetsTable);
         await pool.query(createCategoriesTable);
+        await pool.query(createBudgetsTable);
 
-        // Seed Categories if empty
-        const [cats] = await pool.query('SELECT COUNT(*) as count FROM categories');
+        // Advanced Migration: Check and add user_id to expenses if missing
+        try {
+            const [cols] = await pool.query("SHOW COLUMNS FROM expenses LIKE 'user_id'");
+            if (cols.length === 0) {
+                console.log('[DB] Migrating expenses table - adding user_id');
+                await pool.query("ALTER TABLE expenses ADD COLUMN user_id INT AFTER id");
+            }
+        } catch (e) {
+            console.error('[DB MIGRATION ERROR] Expenses:', e.message);
+        }
+
+        // Migration: Categories user_id
+        try {
+            const [cols] = await pool.query("SHOW COLUMNS FROM categories LIKE 'user_id'");
+            if (cols.length === 0) {
+                await pool.query("ALTER TABLE categories ADD COLUMN user_id INT AFTER id");
+            }
+        } catch (e) {}
+
+        // Seed Global Categories if empty
+        const [cats] = await pool.query('SELECT COUNT(*) as count FROM categories WHERE user_id IS NULL');
         if (cats[0].count === 0) {
             const seedQuery = `
-                INSERT INTO categories (name, icon, color, type) VALUES 
-                ('Food', 'fa-utensils', 'bg-orange-100 text-orange-600', 'expense'),
-                ('Transport', 'fa-car', 'bg-blue-100 text-blue-600', 'expense'),
-                ('Shopping', 'fa-bag-shopping', 'bg-purple-100 text-purple-600', 'expense'),
-                ('Entertainment', 'fa-film', 'bg-pink-100 text-pink-600', 'expense'),
-                ('Health', 'fa-heart-pulse', 'bg-red-100 text-red-600', 'expense'),
-                ('Utilities', 'fa-bolt', 'bg-yellow-100 text-yellow-600', 'expense'),
-                ('Salary', 'fa-wallet', 'bg-green-100 text-green-600', 'income'),
-                ('Freelance', 'fa-laptop-code', 'bg-teal-100 text-teal-600', 'income'),
-                ('Other', 'fa-layer-group', 'bg-gray-100 text-gray-600', 'expense')
+                INSERT INTO categories (user_id, name, icon, color, type) VALUES 
+                (NULL, 'Food', 'fa-utensils', 'bg-orange-100 text-orange-600', 'expense'),
+                (NULL, 'Transport', 'fa-car', 'bg-blue-100 text-blue-600', 'expense'),
+                (NULL, 'Shopping', 'fa-bag-shopping', 'bg-purple-100 text-purple-600', 'expense'),
+                (NULL, 'Entertainment', 'fa-film', 'bg-pink-100 text-pink-600', 'expense'),
+                (NULL, 'Health', 'fa-heart-pulse', 'bg-red-100 text-red-600', 'expense'),
+                (NULL, 'Utilities', 'fa-bolt', 'bg-yellow-100 text-yellow-600', 'expense'),
+                (NULL, 'Salary', 'fa-wallet', 'bg-green-100 text-green-600', 'income'),
+                (NULL, 'Freelance', 'fa-laptop-code', 'bg-teal-100 text-teal-600', 'income'),
+                (NULL, 'Other', 'fa-layer-group', 'bg-gray-100 text-gray-600', 'expense')
             `;
             await pool.query(seedQuery);
         }
 
-        // Upgrades
-        try {
-            await pool.query('ALTER TABLE expenses ADD COLUMN type ENUM("expense", "income") DEFAULT "expense" AFTER category');
-        } catch (e) {}
-
-        try {
-            await pool.query('ALTER TABLE expenses MODIFY COLUMN date DATETIME NOT NULL');
-        } catch (e) {}
-
-        console.log('[DB] Tables initialized and seeded.');
+        console.log('[DB] Multi-user tables initialized.');
 
         return pool;
     } catch (err) {

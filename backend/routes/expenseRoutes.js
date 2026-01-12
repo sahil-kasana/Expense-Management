@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const expenseController = require('../controllers/expenseController');
 
+const authMiddleware = require('../middleware/authMiddleware');
+
+router.use(authMiddleware);
+
 router.get('/', expenseController.getAllExpenses);
 router.post('/', expenseController.addExpense);
 router.put('/:id', expenseController.updateExpense);

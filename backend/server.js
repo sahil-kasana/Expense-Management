@@ -4,6 +4,7 @@ const morgan = require('morgan');
 require('dotenv').config();
 const { initializeDatabase } = require('./config/db');
 const expenseRoutes = require('./routes/expenseRoutes');
+const userRoutes = require('./routes/userRoutes');
 const { error } = require('./utils/responseHelper');
 
 const app = express();
@@ -21,6 +22,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/users', userRoutes);
 app.use('/api/expenses', expenseRoutes);
 
 // 404 Handler

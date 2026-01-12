@@ -28,8 +28,23 @@ async function initializeDatabase() {
             waitForConnections: true,
             connectionLimit: 10,
             queueLimit: 0,
-            connectTimeout: 10000 // 10 seconds timeout
+            connectTimeout: 20000 // 20 seconds timeout
         });
+
+        // Verify connection immediately
+        console.log(`[DB] Attempting to connect to ${dbConfig.host}...`);
+        try {
+            const [rows] = await pool.query('SELECT 1 + 1 AS solution');
+            console.log('[DB] Connection verified successfully!');
+        } catch (connErr) {
+            console.error('[DB CONNECTION FAILED] Details:', {
+                message: connErr.message,
+                code: connErr.code,
+                errno: connErr.errno,
+                host: dbConfig.host
+            });
+            throw connErr;
+        }
 
         const createExpensesTable = `
             CREATE TABLE IF NOT EXISTS expenses (

@@ -11,21 +11,24 @@ let pool;
 
 async function initializeDatabase() {
     try {
-        // First connection without DB to create it if it doesn't exist
-        const connection = await mysql.createConnection(dbConfig);
-        console.log('[DB] Connected to MySQL server.');
+        const isProduction = process.env.DB_HOST && process.env.DB_HOST !== 'localhost';
+        const databaseName = process.env.DB_NAME || 'expense_tracker';
 
-        await connection.query(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME || 'expense_tracker'}`);
-        console.log(`[DB] Database "${process.env.DB_NAME || 'expense_tracker'}" checked/created.`);
-        await connection.end();
+        if (!isProduction) {
+            // Development: Try to create DB if it doesn't exist
+            const connection = await mysql.createConnection(dbConfig);
+            await connection.query(`CREATE DATABASE IF NOT EXISTS ${databaseName}`);
+            await connection.end();
+        }
 
-        // Create pool with the database
+        // Create pool directly with the database
         pool = mysql.createPool({
             ...dbConfig,
-            database: process.env.DB_NAME || 'expense_tracker',
+            database: databaseName,
             waitForConnections: true,
             connectionLimit: 10,
-            queueLimit: 0
+            queueLimit: 0,
+            connectTimeout: 10000 // 10 seconds timeout
         });
 
         const createExpensesTable = `

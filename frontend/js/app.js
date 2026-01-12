@@ -290,7 +290,7 @@ function renderExpenseItem(exp) {
                 <div class="w-10 h-10 ${cat.color} rounded-lg flex items-center justify-center text-md"><i class="fas ${cat.icon}"></i></div>
                 <div>
                     <h4 class="font-bold text-gray-800 text-sm">${exp.title}</h4>
-                    <p class="text-[10px] text-gray-400">${new Date(exp.date).toLocaleDateString('en-IN')}</p>
+                    <p class="text-[10px] text-gray-400">${new Date(exp.date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                 </div>
             </div>
             <div class="flex items-center gap-4">
@@ -324,7 +324,7 @@ function renderTransactionsTable(search = '') {
                 <td class="px-6 py-4">
                     <span class="px-3 py-1 rounded-lg text-[10px] font-bold ${cat.color} whitespace-nowrap">${exp.category}</span>
                 </td>
-                <td class="px-6 py-4 text-gray-400 text-xs">${new Date(exp.date).toLocaleDateString('en-IN')}</td>
+                <td class="px-6 py-4 text-gray-400 text-xs">${new Date(exp.date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
                 <td class="px-6 py-4 font-bold ${isIncome ? 'text-green-600' : 'text-gray-900'}">${rupeeFormatter.format(exp.amount)}</td>
                 <td class="px-6 py-4 text-right">
                     <div class="flex gap-3">
@@ -491,7 +491,7 @@ async function handleFormSubmit(e) {
         }
         
         try {
-            const catRes = await fetch('http://localhost:5000/api/expenses/categories', {
+            const catRes = await fetch(`${BASE_URL}/api/expenses/categories`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: customCatName, type: type })
@@ -567,8 +567,18 @@ function editExpense(id) {
     select.value = exp.category;
     document.getElementById('customCategoryGroup').classList.add('hidden');
 
-    document.getElementById('date').value = exp.date.split('T')[0];
-    document.getElementById('description').value = exp.description;
+    // Format date for datetime-local: YYYY-MM-DDTHH:mm
+    const dateObj = new Date(exp.date);
+    const formattedDate = dateObj.toLocaleString('sv-SE', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).replace(' ', 'T');
+    
+    document.getElementById('date').value = formattedDate;
+    document.getElementById('description').value = exp.description || '';
     
     // Set type radio
     const typeRadio = document.querySelector(`input[name="type"][value="${exp.type}"]`);
@@ -587,7 +597,12 @@ function openAddModal() {
     document.getElementById('expenseId').value = '';
     document.getElementById('modalTitle').textContent = 'New Transaction';
     document.getElementById('deleteTxnBtn').classList.add('hidden');
-    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    
+    // Set local current date & time
+    const tzoffset = (new Date()).getTimezoneOffset() * 60000; 
+    const localISOTime = (new Date(Date.now() - tzoffset)).toISOString().slice(0, 16);
+    document.getElementById('date').value = localISOTime;
+    
     expenseModal.classList.remove('hidden');
     setTimeout(() => expenseModal.classList.add('opacity-100'), 10);
 }

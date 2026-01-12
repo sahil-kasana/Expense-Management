@@ -53,7 +53,7 @@ async function initializeDatabase() {
                 amount DECIMAL(10, 2) NOT NULL,
                 category VARCHAR(100) NOT NULL,
                 type ENUM('expense', 'income') DEFAULT 'expense',
-                date DATE NOT NULL,
+                date DATETIME NOT NULL,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -98,9 +98,13 @@ async function initializeDatabase() {
             await pool.query(seedQuery);
         }
 
-        // Add type column if it doesn't exist
+        // Upgrades
         try {
             await pool.query('ALTER TABLE expenses ADD COLUMN type ENUM("expense", "income") DEFAULT "expense" AFTER category');
+        } catch (e) {}
+
+        try {
+            await pool.query('ALTER TABLE expenses MODIFY COLUMN date DATETIME NOT NULL');
         } catch (e) {}
 
         console.log('[DB] Tables initialized and seeded.');

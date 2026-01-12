@@ -488,8 +488,9 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2">
-                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Date</label>
-                        <input type="date" id="date" required
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Date &
+                            Time</label>
+                        <input type="datetime-local" id="date" required
                             class="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm">
                     </div>
                     <div class="space-y-2">
@@ -502,6 +503,13 @@
                                 class="px-3 py-1 bg-gray-50 text-gray-500 text-[10px] font-bold rounded-full border border-gray-100 whitespace-nowrap">Office</span>
                         </div>
                     </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Notes /
+                        Description</label>
+                    <textarea id="description" placeholder="Optional notes about this transaction..."
+                        class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm min-h-[80px] resize-none"></textarea>
                 </div>
 
                 <div class="flex gap-4 mt-4">

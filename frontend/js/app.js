@@ -326,10 +326,12 @@ function setupEventListeners() {
     document.getElementById('unlockBtn').addEventListener('click', unlockApp);
 
     // Delete in Modal
-    document.getElementById('deleteTxnBtn').addEventListener('click', () => {
+    document.getElementById('deleteTxnBtn').addEventListener('click', async () => {
         const id = document.getElementById('expenseId').value;
-        if (id) deleteExpense(parseInt(id));
-        closeModal();
+        if (id) {
+            const success = await deleteExpense(parseInt(id));
+            if (success) closeModal();
+        }
     });
 }
 
@@ -719,17 +721,19 @@ async function handleFormSubmit(e) {
 }
 
 async function deleteExpense(id) {
-    if (!confirm('Are you sure you want to delete this transaction?')) return;
+    if (!confirm('Are you sure you want to delete this transaction?')) return false;
     try {
         const res = await authFetch(`${API_URL}/${id}`, { method: 'DELETE' });
         const result = await res.json();
         if (result.success) {
             showToast('Deleted successfully');
             fetchExpenses();
+            return true;
         }
     } catch (err) {
         showToast('Delete failed', 'error');
     }
+    return false;
 }
 
 async function fetchCategories() {
